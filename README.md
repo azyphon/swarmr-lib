@@ -23,16 +23,25 @@ agent stack.
 `digest`, `is_error`, `report_tool`, `default_request`, `recursion_limit`), so
 `core` renders and records without assuming any role, payload or limit exists.
 
-## Setup
+## Install
+
+Distributed from git, not an index. To run it:
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-printf 'KIMI_API_KEY=sk-…\nKIMI_MODEL=kimi-for-coding\n' > .env && chmod 600 .env
+uv tool install git+https://github.com/azyphon/swarmr-lib \
+  --with git+https://github.com/azyphon/swarmr-k8s-incident \
+  --with-executables-from swarmr-k8s-incident
 ```
 
-Then install whichever teams you want, into the same environment:
+`--with` puts the team in the same environment, which is what discovery
+requires. `--with-executables-from` is separate and easy to miss: without it
+only core's `teams` and `teams-mcp` reach your PATH, and a team's own commands
+stay inside the tool environment. Omit it if the team ships none. A plain venv
+works too:
 
 ```bash
+python3 -m venv .venv
+.venv/bin/pip install git+https://github.com/azyphon/swarmr-lib
 .venv/bin/pip install git+https://github.com/azyphon/swarmr-k8s-incident
 ```
 
@@ -40,17 +49,27 @@ Then install whichever teams you want, into the same environment:
 metadata of installed distributions, not through paths, so where the repos sit
 on disk is irrelevant and two virtualenvs are two disconnected worlds.
 
-**Core first.** A team declares `swarmr>=0.1,<0.2`, which pip resolves against
-an index. Until this package is published to one, installing a team into an
-empty environment fails with `No matching distribution found for swarmr`;
-installing core from git first satisfies the requirement.
+**Core first.** A team declares `swarmr>=1.0,<2`, and pip resolves that against
+an index it will not find core on. Installing core from git first satisfies the
+requirement; pip then leaves the installed copy alone. The dependency stays a
+version rather than a git URL so that moving to an index later changes nothing
+in the team.
+
+Then a model key, in the directory you run from:
+
+```bash
+printf 'KIMI_API_KEY=sk-…\nKIMI_MODEL=kimi-for-coding\n' > .env && chmod 600 .env
+```
+
+Loading walks up from the current directory, then falls back to `~/.env`;
+`KIMI_ENV_FILE` overrides both.
 
 ## CLI
 
 ```bash
-.venv/bin/teams --list
-.venv/bin/teams --target <team>      # profile the target, then exit
-.venv/bin/teams <team> "the symptom, as prose"
+teams --list
+teams --target <team>      # profile the target, then exit
+teams <team> "the symptom, as prose"
 ```
 
 Output shows delegation live: the plan, parallel dispatches, each tool call with
@@ -64,14 +83,17 @@ token counts.
   "mcpServers": {
     "swarmr": {
       "type": "stdio",
-      "command": "/abs/path/.venv/bin/python",
-      "args": ["-m", "swarmr.server"],
-      "cwd": "/abs/path",
+      "command": "teams-mcp",
+      "cwd": "/abs/path/to/your/working/dir",
       "timeout": 0
     }
   }
 }
 ```
+
+`cwd` is where the server looks for `.env` and any team credentials, so point
+it at the directory you would otherwise `cd` into. If `teams-mcp` is not on the
+PATH your MCP client sees, give the absolute path to it instead.
 
 Tools: `start_<team>` for every installed team, plus `check_task` and
 `list_tasks`. Runs take minutes and MCP is request/response, so `start_*`
@@ -89,7 +111,7 @@ Create a distribution that declares a `Team`, and advertise it:
 
 ```toml
 [project]
-dependencies = ["swarmr>=0.1,<0.2", "whatever-sdk>=1"]
+dependencies = ["swarmr>=1.0,<2", "whatever-sdk>=1"]
 
 [project.entry-points."swarmr.teams"]
 my_team = "my_package:TEAM"
@@ -118,17 +140,23 @@ agent framework, model SDK or domain client goes behind `Lazy`.
 Everything a team may depend on, and the surface a minor release may move:
 `Team`, `RunContext`, `TeamBuild`, `Member`, `Lazy`, `TeamError`, `Attribution`,
 the middleware in `core.middleware`, the stubs in `core.testing`, and the
-`swarmr.teams` entry-point group name. Pin `swarmr>=0.1,<0.2`.
+`swarmr.teams` entry-point group name. Pin `swarmr>=1.0,<2`.
 
 `core.testing` ships `EXAMPLE_TEAM`, `TeamFactory`, `JobFactory` and `GraphStub`
 so a team in another distribution tests against the same stand-ins core does.
 
-## Tests
+## Development
 
 ```bash
-.venv/bin/python -m pytest
-.venv/bin/ruff check . && .venv/bin/pyright
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+pytest && ruff check . && pyright
 ```
+
+Activate the venv rather than calling `.venv/bin/…` directly: pyright resolves
+the interpreter from PATH, so unactivated it type-checks against a Python that
+has none of the dependencies and reports every import as unresolved. Without
+activating, pass `--pythonpath .venv/bin/python`.
 
 The suite passes with **no team installed**, which is the proof that core stands
 alone. Discovery is exercised against an injected entry point pointing at
