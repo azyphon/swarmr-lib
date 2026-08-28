@@ -6,9 +6,6 @@ specialists, exposed two ways: a streaming terminal CLI and an MCP server.
 This is the core distribution. It ships **no team**. Teams live in their own
 repositories, depend on this one, and are found through installed metadata.
 
-- [`swarmr-k8s-incident`](https://github.com/azyphon/swarmr-k8s-incident) —
-  Kubernetes incident response.
-
 ## How it fits together
 
 **Dependencies flow one way: teams → core.** Teams never import each other, and
