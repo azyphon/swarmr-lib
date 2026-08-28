@@ -2,9 +2,9 @@
 
 Layout:
     core/    domain-free machinery: model wiring, renderer, job store, runner
-    teams/   one package per domain team; `teams/__init__.py` is discovery
+    teams/   discovery; core ships no team of its own
     cli.py   terminal entrypoint with live streaming
-    server.py MCP server exposing one tool per team
+    server.py MCP server exposing one tool per installed team
 
 Dependencies flow one way: teams -> core. Teams never import each other, which
 is what makes any team deletable in one edit: discovery reads the
@@ -18,6 +18,8 @@ one.
 """
 
 from __future__ import annotations
+
+from importlib.metadata import version
 
 from swarmr.core.team import (
     Lazy,
@@ -38,4 +40,4 @@ __all__ = [
     "__version__",
 ]
 
-__version__ = "0.1.0"
+__version__ = version("swarmr")

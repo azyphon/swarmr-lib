@@ -1,6 +1,6 @@
 [project]
 name = "swarmr"
-version = "0.1.0"
+version = "1.0.0"
 description = "Deep Agents teams of domain specialists, exposed over MCP and a terminal CLI."
 requires-python = ">=3.13"
 # Core only: the shared machinery, the CLI and the MCP server. Teams live in
@@ -39,8 +39,11 @@ packages = ["src/swarmr"]
 exclude = ["**/tests"]
 
 [tool.pyright]
-venvPath = "."
-venv = ".venv"
+# No venvPath/venv: those hardcode a `./.venv` that exists on a contributor's
+# machine and nowhere else. CI installs into the interpreter already on PATH,
+# and pinning a directory there made pyright find no interpreter at all and
+# report every third-party import as unresolved. Pyright takes the interpreter
+# from PATH, so activate the venv (or pass --pythonpath) when running locally.
 pythonVersion = "3.13"
 include = ["src", "tests", "conftest.py"]
 exclude = [".venv", "**/__pycache__"]
