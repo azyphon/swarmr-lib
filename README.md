@@ -116,6 +116,11 @@ Then install whichever teams you want, into the same environment:
 metadata of installed distributions, not through paths, so where the repos sit
 on disk is irrelevant and two virtualenvs are two disconnected worlds.
 
+**Core first.** A team declares `swarmr>=0.1,<0.2`, which pip resolves against
+an index. Until this package is published to one, installing a team into an
+empty environment fails with `No matching distribution found for swarmr`;
+installing core from git first satisfies the requirement.
+
 ## CLI
 
 ```bash
