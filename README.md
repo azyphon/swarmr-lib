@@ -9,95 +9,22 @@ repositories, depend on this one, and are found through installed metadata.
 - [`swarmr-k8s-incident`](https://github.com/azyphon/swarmr-k8s-incident) —
   Kubernetes incident response.
 
-## Structure
-
-```
-src/swarmr/
-├── core/                 domain-free machinery
-│   ├── team.py           the Team contract: build(run), vocabulary, limits
-│   ├── harness.py        the deepagents names core reads off the stream
-│   ├── model.py          shared LLM wiring
-│   ├── runner.py         one run loop for both surfaces
-│   ├── events.py         stream chunks -> delegation events
-│   ├── attribution.py    stream id -> subagent name, per run
-│   ├── middleware.py     the only place core touches the agent framework
-│   ├── briefing.py       the first-round briefing rule
-│   ├── render.py         terminal renderer
-│   ├── report.py         job/usage formatting
-│   ├── jobs.py           background jobs, trail cursor, milestones
-│   ├── usage.py          per-agent token accounting
-│   ├── digest.py         shape-only fallback summary
-│   ├── text.py           shared text helpers
-│   ├── testing.py        Team/Job stubs any team tests against
-│   └── tests/            shared machinery only; may not import a team
-├── teams/
-│   └── __init__.py       discovery: reads the entry-point group, nothing else
-├── cli.py
-└── server.py
-
-conftest.py               the shared fixtures, at the one common ancestor
-tests/                    the composed whole, owned by no single slice
-├── test_cli.py           the terminal entrypoint
-├── test_server.py        the MCP surface, driven in-process
-└── test_teams_registry.py  discovery, and what listing teams may cost
-```
-
-**One responsibility per file.**
+## How it fits together
 
 **Dependencies flow one way: teams → core.** Teams never import each other, and
 `core` knows nothing about any domain — no role names, no payload shapes, not
-even what a failed tool result looks like. Nothing in this repository names a
-team; `pip install` and `pip uninstall` are the whole lifecycle.
+even what a failed tool result looks like. Nothing here names a team;
+`pip install` and `pip uninstall` are the whole lifecycle.
 
-**Nothing loads until it is used.** `names()` reads installed metadata and
-imports nothing. A team's heavyweight fields are declared with `core.team.Lazy`
-and resolved on first call, so listing teams — which the MCP server does on
-every start, to read each team's `name`, `summary` and `description` — never
-loads an agent stack.
+**Nothing loads until it is used.** Discovery reads installed metadata and
+imports nothing. A team's heavyweight fields are declared with `Lazy` and
+resolved on first call, so listing teams — which the MCP server does on every
+start, to read each team's `name`, `summary` and `description` — never loads an
+agent stack.
 
-A team supplies its own vocabulary (`orchestrator`, `audit_agents`, `digest`,
-`is_error`, `report_tool`, `default_request`, `recursion_limit`), so `core`
-renders and records without assuming any role, payload or limit exists.
-
-## Adding a team
-
-Create a distribution that declares a `Team`, and advertise it:
-
-```toml
-[project]
-dependencies = ["swarmr>=0.1,<0.2", "whatever-sdk>=1"]
-
-[project.entry-points."swarmr.teams"]
-my_team = "my_package:TEAM"
-```
-
-```python
-from swarmr.core.team import Lazy, Member, Team
-
-TEAM = Team(
-    name="my_team",
-    summary="One sentence, shown in tool listings.",
-    description="What the calling model routes on: symptoms, not subject area.",
-    build=Lazy("my_package.agent:build"),  # imported on first run
-    profile=Lazy("my_package.agent:profile"),  # optional, no model needed
-    members=(Member("lead", "what it investigates"),),
-)
-```
-
-That is the whole coupling. The CLI and the MCP server iterate discovery, so the
-team gets a `start_my_team` tool and a CLI command with no further edits, and
-`pip uninstall` unregisters it. The only rule is that anything importing an
-agent framework, model SDK or domain client goes behind `Lazy`.
-
-### The ABI
-
-Everything a team is allowed to depend on, and the surface a minor release may
-move: `Team`, `RunContext`, `TeamBuild`, `Member`, `Lazy`, `TeamError`,
-`Attribution`, the middleware in `core.middleware`, the stubs in `core.testing`,
-and the `swarmr.teams` entry-point group name. Pin `swarmr>=0.1,<0.2`.
-
-`core.testing` ships `EXAMPLE_TEAM`, `TeamFactory`, `JobFactory` and `GraphStub`
-so a team in another distribution tests against the same stand-ins core does.
+**A team supplies its own vocabulary** (`orchestrator`, `audit_agents`,
+`digest`, `is_error`, `report_tool`, `default_request`, `recursion_limit`), so
+`core` renders and records without assuming any role, payload or limit exists.
 
 ## Setup
 
@@ -159,12 +86,50 @@ calling model routes on tool descriptions.
 Install a team, restart the server, and its tool appears. No configuration
 changes.
 
+## Adding a team
+
+Create a distribution that declares a `Team`, and advertise it:
+
+```toml
+[project]
+dependencies = ["swarmr>=0.1,<0.2", "whatever-sdk>=1"]
+
+[project.entry-points."swarmr.teams"]
+my_team = "my_package:TEAM"
+```
+
+```python
+from swarmr.core.team import Lazy, Member, Team
+
+TEAM = Team(
+    name="my_team",
+    summary="One sentence, shown in tool listings.",
+    description="What the calling model routes on: symptoms, not subject area.",
+    build=Lazy("my_package.agent:build"),  # imported on first run
+    profile=Lazy("my_package.agent:profile"),  # optional, no model needed
+    members=(Member("lead", "what it investigates"),),
+)
+```
+
+That is the whole coupling. The CLI and the MCP server iterate discovery, so the
+team gets a `start_my_team` tool and a CLI command with no further edits, and
+`pip uninstall` unregisters it. The only rule is that anything importing an
+agent framework, model SDK or domain client goes behind `Lazy`.
+
+### The ABI
+
+Everything a team may depend on, and the surface a minor release may move:
+`Team`, `RunContext`, `TeamBuild`, `Member`, `Lazy`, `TeamError`, `Attribution`,
+the middleware in `core.middleware`, the stubs in `core.testing`, and the
+`swarmr.teams` entry-point group name. Pin `swarmr>=0.1,<0.2`.
+
+`core.testing` ships `EXAMPLE_TEAM`, `TeamFactory`, `JobFactory` and `GraphStub`
+so a team in another distribution tests against the same stand-ins core does.
+
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest              # no cluster, no model calls
-.venv/bin/python -m pytest src/swarmr   # shared machinery
-.venv/bin/python -m pytest tests        # the composed whole
+.venv/bin/python -m pytest
 .venv/bin/ruff check . && .venv/bin/pyright
 ```
 
