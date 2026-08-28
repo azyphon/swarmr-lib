@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/azyphon/swarmr-lib/compare/v1.0.0...v1.0.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* some small fixes ([#3](https://github.com/azyphon/swarmr-lib/issues/3)) ([7c70374](https://github.com/azyphon/swarmr-lib/commit/7c70374b387f14b211a490f39425a18a1776e5f6))
+
 ## 1.0.0 (2026-08-28)
 
 
